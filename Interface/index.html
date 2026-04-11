@@ -1,35 +1,187 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
+    <title>Mô phỏng DFS/BFS — TPLTM &amp; Định chiều</title>
     <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-    <div class="container">1
-        <div class="navbar-container">2
-            <div class="navbar"></div>
-        </div>
-        <div class="content">3
-            <div class="content-left"></div>
-            <div class="content-right"></div>
-        </div>
+    <div class="app">
+        <header class="header">
+            <h1>Mô phỏng đồ thị — DFS / BFS (TPLTM &amp; định chiều được)</h1>
+        </header>
 
+        <main class="main">
+            <section class="col-left">
+                <div class="canvas-wrap">
+                    <canvas id="graphCanvas" width="720" height="420" aria-label="Vùng vẽ đồ thị"></canvas>
+                </div>
+                <div class="legend" id="legend">
+                    <span class="legend-item"><i class="swatch swatch-unvisited"></i> Chưa thăm</span>
+                    <span class="legend-item"><i class="swatch swatch-active"></i> Đang xét</span>
+                    <span class="legend-item"><i class="swatch swatch-visited"></i> Đã thăm</span>
+                    <span class="legend-item"><i class="swatch swatch-path"></i> Đường đi / nhóm</span>
+                    <span class="legend-item"><span class="swatch swatch-edge-hl"></span> Cạnh đang duyệt</span>
+                </div>
+                <div class="card info-card">
+                    <h2>Thông tin mô phỏng</h2>
+                    <ul class="info-list">
+                        <li><span class="label">Số thành phần liên thông (vô hướng):</span> <strong id="infoWeak">—</strong></li>
+                        <li><span class="label">Số TPLTM (có hướng):</span> <strong id="infoScc">—</strong></li>
+                        <li><span class="label">Định chiều mạnh (Robbins):</span> <strong id="infoOrient">—</strong></li>
+                        <li><span class="label">Bước hiện tại:</span> <strong id="infoStep">0</strong></li>
+                        <li><span class="label">Đỉnh đang xét:</span> <strong id="infoVertex">Chưa bắt đầu</strong></li>
+                        <li><span class="label">Ghi chú bước:</span> <strong id="infoMsg">—</strong></li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="col-right">
+                <div class="card">
+                    <h2>Nhiệm vụ / Chế độ</h2>
+                    <p class="muted">Nhiệm vụ: <span id="questLabel">Chưa chọn</span></p>
+                    <p class="muted">Trạng thái: <span id="simStatus">Ready</span></p>
+                    <label class="field">
+                        <span>Chế độ mô phỏng</span>
+                        <select id="modeSelect">
+                            <option value="traverse">Duyệt đồ thị (BFS / DFS)</option>
+                            <option value="scc">Tìm TPLTM — Tarjan (DFS, một lần duyệt)</option>
+                            <option value="kosaraju">Tìm TPLTM — Kosaraju (GĐ1: DFS xếp L; GĐ2: BFS trên G^T)</option>
+                            <option value="orient">Kiểm tra định chiều mạnh (cầu — DFS / BFS)</option>
+                        </select>
+                    </label>
+                    <label class="field" id="orientAlgoField">
+                        <span>Tìm cầu (định chiều)</span>
+                        <select id="orientAlgoSelect">
+                            <option value="dfs">DFS — thời gian thăm &amp; low</option>
+                            <option value="bfs">BFS — loại từng cạnh, kiểm tra liên thông</option>
+                        </select>
+                    </label>
+                    <div id="algoTraverseWrap">
+                        <label class="field">
+                            <span>Thuật toán duyệt</span>
+                            <select id="algoSelect">
+                                <option value="bfs">BFS (hàng đợi)</option>
+                                <option value="dfs">DFS (đệ quy / stack)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoTarjanHint">
+                        <span>Thuật toán duyệt</span>
+                        <div class="algo-mode-readonly">DFS (Tarjan)</div>
+                    </div>
+                    <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoKosarajuHint">
+                        <span>Thuật toán duyệt</span>
+                        <div class="algo-mode-readonly">DFS (giai đoạn 1) + BFS trên G^T (giai đoạn 2)</div>
+                    </div>
+                    <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoOrientHint">
+                        <span>Thuật toán duyệt</span>
+                        <div class="algo-mode-readonly" id="algoOrientReadonly"></div>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-primary" id="btnBuildSim">Tạo mô phỏng</button>
+                        <button type="button" class="btn" id="btnCheck">Kiểm tra / áp màu kết quả</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Điều khiển</h2>
+                    <div class="grid-2">
+                        <label class="field">
+                            <span>Đỉnh bắt đầu</span>
+                            <select id="startSelect"></select>
+                        </label>
+                        <label class="field">
+                            <span>Đỉnh kết thúc</span>
+                            <select id="endSelect"></select>
+                        </label>
+                    </div>
+                    <label class="field">
+                        <span>Đồ thị</span>
+                        <select id="directedSelect">
+                            <option value="undirected">Vô hướng</option>
+                            <option value="directed">Có hướng</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Tốc độ chạy (ms)</span>
+                        <input type="number" id="speedInput" value="800" min="100" step="100">
+                    </label>
+                    <div class="btn-row wrap">
+                        <button type="button" class="btn btn-run" id="btnPlay">▶ Chạy</button>
+                        <button type="button" class="btn" id="btnPause">⏸ Dừng</button>
+                        <button type="button" class="btn" id="btnStep">⏯ Step</button>
+                        <button type="button" class="btn" id="btnReset">↺ Reset</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Chỉnh sửa đồ thị</h2>
+                    <div class="grid-2">
+                        <label class="field">
+                            <span>Thêm đỉnh</span>
+                            <input type="text" id="addVertexInput" placeholder="VD: A hoặc 1">
+                        </label>
+                        <div class="field btn-only">
+                            <button type="button" class="btn btn-block" id="btnAddVertex">Add Vertex</button>
+                        </div>
+                    </div>
+                    <div class="grid-2">
+                        <label class="field">
+                            <span>Xóa đỉnh</span>
+                            <input type="text" id="delVertexInput" placeholder="VD: 6">
+                        </label>
+                        <div class="field btn-only">
+                            <button type="button" class="btn btn-block" id="btnDelVertex">Delete Vertex</button>
+                        </div>
+                    </div>
+                    <div class="edge-row">
+                        <label class="field grow">
+                            <span>Cạnh u → v</span>
+                            <div class="inline-2">
+                                <input type="text" id="edgeU" placeholder="u">
+                                <input type="text" id="edgeV" placeholder="v">
+                            </div>
+                        </label>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" class="btn" id="btnAddEdge">Add Edge</button>
+                        <button type="button" class="btn" id="btnDelEdge">Delete Edge</button>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" class="btn" id="btnLayout">Sắp xếp lại đồ thị</button>
+                        <button type="button" class="btn" id="btnUpdateWeak">Cập nhật TPLT</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 id="structureTitle">Hàng đợi (Queue)</h2>
+                    <div class="table-wrap">
+                        <table class="data-table" id="structureTable">
+                            <thead><tr><th>Bước</th><th id="structureCol2">Hàng đợi</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Bảng kết quả</h2>
+                    <div class="table-wrap">
+                        <table class="data-table" id="resultTable">
+                            <thead>
+                                <tr>
+                                    <th>Đỉnh</th>
+                                    <th id="resultCol2">Thông tin</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
     <script src="./script.js"></script>
 </body>
 </html>
