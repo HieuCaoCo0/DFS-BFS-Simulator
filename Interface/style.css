@@ -1,0 +1,23 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+.container{
+    display:flex;
+    /* justify-content: center;
+    align-items: center; */
+    
+    height: 100vh;
+    width: 100vw;
+}
+.content-left{
+    width: 55%;
+    height: 100%;
+    background-color: red;
+}
+.content-right{
+    width: 45%;
+    height: 100%;
+    background-color: blue;
+}
