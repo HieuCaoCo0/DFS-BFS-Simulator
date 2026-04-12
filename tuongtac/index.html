@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mô phỏng Đồ thị: DFS & BFS (Ctrl+Z Undo)</title>
+    <link rel="icon" href="image.png?v=2" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        :root {
+            --bg-main: #0f172a; --bg-panel: #1e293b; --bg-card: #334155; --bg-input: #0f172a;
+            --text-main: #f8fafc; --text-muted: #94a3b8;
+            --primary: #3b82f6; --primary-hover: #2563eb;
+            --danger: #ef4444; --danger-hover: #dc2828;
+            --success: #10b981; --success-hover: #059669;
+            --purple: #8b5cf6; --purple-hover: #7c3aed;
+            --gray: #64748b; --gray-hover: #475569; --warning: #f59e0b;
+            --border: #475569; --border-focus: #60a5fa;
+        }
+
+        body {
+            margin: 0; padding: 0; font-family: 'Times New Roman', Times, serif; 
+            display: flex; height: 100vh; width: 100vw; overflow: hidden;
+            background-color: var(--bg-main); color: var(--text-main);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        .resizer {
+            width: 6px; background-color: var(--bg-panel); cursor: col-resize;
+            position: relative; z-index: 20; border-left: 1px solid rgba(255, 255, 255, 0.05);
+            border-right: 1px solid rgba(255, 255, 255, 0.05); transition: background-color 0.2s; flex-shrink: 0;
+        }
+        .resizer:hover, .resizer.resizing { background-color: var(--primary); }
+
+        #panel {
+            width: 360px; min-width: 250px; max-width: 50vw; background: var(--bg-panel); padding: 24px;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.5); z-index: 10; display: flex; flex-direction: column; 
+            overflow-y: auto; flex-shrink: 0; box-sizing: border-box;
+        }
+
+        h2 {
+            margin-top: 0; color: #38bdf8; font-size: 22px; font-weight: bold;
+            display: flex; align-items: center; gap: 10px; border-bottom: 2px solid var(--border); 
+            padding-bottom: 12px; margin-bottom: 20px; text-transform: uppercase;
+        }
+
+        .control-group {
+            background: var(--bg-card); padding: 18px; margin-bottom: 16px; border-radius: 12px; 
+            border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .control-group label {
+            font-weight: bold; color: #e2e8f0; display: flex; align-items: center; gap: 8px;
+            margin-bottom: 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .input-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; }
+
+        .input-box {
+            display: flex; align-items: center; flex: 1; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 6px; padding: 0 8px; transition: all 0.2s;
+        }
+        .input-box:focus-within { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .input-box span { color: var(--text-muted); font-size: 14px; font-weight: bold; white-space: nowrap; }
+
+        input {
+            width: 100%; padding: 8px; border: none; background: transparent; color: #fff; 
+            font-weight: bold; font-size: 16px; text-align: center; outline: none; 
+            font-family: 'Times New Roman', Times, serif; min-width: 0;
+        }
+        input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        select {
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
+            background: var(--bg-input); color: white; font-size: 16px; font-weight: bold;
+            cursor: pointer; outline: none; font-family: 'Times New Roman', Times, serif;
+        }
+        select:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+
+        button {
+            width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold;
+            font-size: 15px; cursor: pointer; transition: all 0.2s; display: flex;
+            align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-family: 'Times New Roman', Times, serif;
+        }
+        button:active { transform: scale(0.98); }
+
+        .btn-add { background: var(--primary); color: white; }
+        .btn-add:hover { background: var(--primary-hover); }
+        .btn-del { background: var(--danger); color: white; }
+        .btn-del:hover { background: var(--danger-hover); }
+        .btn-check-1 { background: var(--success); color: white; margin-top: 10px; }
+        .btn-check-1:hover { background: var(--success-hover); }
+        .btn-check-2 { background: var(--purple); color: white; }
+        .btn-check-2:hover { background: var(--purple-hover); }
+        .btn-fit { background: #0ea5e9; color: white; margin-top: 10px; }
+        .btn-fit:hover { background: #0284c7; }
+        .btn-clear { background: var(--gray); color: white; margin-top: 15px; }
+        .btn-clear:hover { background: var(--gray-hover); }
+
+        .shortcut-badge { background: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-left: 4px; font-family: monospace; }
+
+        #mynetwork { flex-grow: 1; min-width: 200px; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); height: 100%; }
+
+        #log-panel {
+            width: 340px; min-width: 250px; max-width: 50vw; background: var(--bg-panel); padding: 24px; 
+            box-shadow: -4px 0 15px rgba(0, 0, 0, 0.5); z-index: 10; display: flex; flex-direction: column; 
+            flex-shrink: 0; box-sizing: border-box;
+        }
+
+        #log {
+            flex-grow: 1; background: #020617; color: #fcd34d; padding: 15px; border-radius: 8px;
+            font-family: 'Consolas', 'Courier New', monospace; font-size: 14px; overflow-y: auto; 
+            white-space: pre-wrap; line-height: 1.5; border: 1px solid var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <h2><i class="fa-solid fa-project-diagram"></i> KHÔNG GIAN ĐỒ THỊ</h2>
+
+        <div class="control-group">
+            <label style="color: #60a5fa;"><i class="fa-solid fa-plus-circle"></i> Thêm Cạnh</label>
+            <div class="input-row">
+                <div class="input-box"><span>Từ</span><input type="number" id="add-u" placeholder="u" min="1"></div>
+                <i class="fa-solid fa-arrow-right" style="color: var(--text-muted);"></i>
+                <div class="input-box"><span>Đến</span><input type="number" id="add-v" placeholder="v" min="1"></div>
+            </div>
+            <button class="btn-add" onclick="addEdge()"><i class="fa-solid fa-check"></i> Xác nhận thêm</button>
+        </div>
+
+        <div class="control-group">
+            <label style="color: #f87171;"><i class="fa-solid fa-minus-circle"></i> Xóa Cạnh</label>
+            <div class="input-row">
+                <div class="input-box"><span>Từ</span><input type="number" id="del-u" placeholder="u" min="1"></div>
+                <i class="fa-solid fa-arrow-right" style="color: var(--text-muted);"></i>
+                <div class="input-box"><span>Đến</span><input type="number" id="del-v" placeholder="v" min="1"></div>
+            </div>
+            <button class="btn-del" onclick="deleteEdge()"><i class="fa-solid fa-trash-can"></i> Xóa cạnh này</button>
+        </div>
+
+        <div class="control-group">
+            <label style="color: #fb923c;"><i class="fa-solid fa-circle-xmark"></i> Xóa Đỉnh</label>
+            <div class="input-box" style="margin-bottom: 12px; padding: 4px 8px;">
+                <span>Đỉnh</span><input type="number" id="del-node" placeholder="Nhập ID cần xóa" min="1">
+            </div>
+            <button class="btn-del" style="background: #ea580c;" onclick="deleteNode()"><i class="fa-solid fa-bomb"></i> Xóa toàn bộ đỉnh</button>
+        </div>
+
+        <div class="control-group" style="margin-bottom: 0; padding-bottom: 10px;">
+            <label style="color: #34d399;"><i class="fa-solid fa-microchip"></i> Thuật Toán & Kiểm Tra</label>
+            <select id="algoMethod" style="margin-bottom: 15px;">
+                <option value="DFS">Thuật toán: DFS</option>
+                <option value="BFS">Thuật toán: BFS</option>
+            </select>
+            <button class="btn-check-1" onclick="checkGraph('scc')"><i class="fa-solid fa-link"></i> Liên thông mạnh <span class="shortcut-badge">Alt+S</span></button>
+            <button class="btn-check-2" onclick="checkGraph('orientable')"><i class="fa-solid fa-arrows-turn-right"></i> Định chiều được <span class="shortcut-badge">Alt+D</span></button>
+            <button class="btn-fit" onclick="fitGraph()"><i class="fa-solid fa-compress"></i> Căn chỉnh đồ thị <span class="shortcut-badge">Alt+F</span></button>
+            <button class="btn-clear" onclick="resetGraph()"><i class="fa-solid fa-broom"></i> Dọn dẹp đồ thị <span class="shortcut-badge">Alt+X</span></button>
+        </div>
+    </div>
+
+    <div class="resizer" id="resizer-left"></div>
+    <div id="mynetwork"></div>
+    <div class="resizer" id="resizer-right"></div>
+
+    <div id="log-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 12px;">
+            <h2 style="color: #fcd34d; margin: 0; border: none; padding: 0;"><i class="fa-solid fa-terminal"></i> THÔNG BÁO LỆNH</h2>
+            <div style="display: flex; gap: 8px;">
+                <button id="btn-toggle-color" onclick="toggleColor()" style="background: var(--gray); padding: 6px 12px; margin: 0; font-size: 14px;" title="Bật/Tắt màu kết quả thuật toán">
+                    <i class="fa-solid fa-eye"></i>
+                </button>
+                <button onclick="undoAction()" style="background: var(--warning); padding: 6px 12px; margin: 0; font-size: 14px;" title="Hoàn tác (Ctrl + Z)">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="clearLog()" style="background: var(--gray); padding: 6px 12px; margin: 0; font-size: 14px;" title="Dọn dẹp lịch sử">
+                    <i class="fa-solid fa-eraser"></i>
+                </button>
+            </div>
+        </div>
+        <div id="log">Hệ thống sẵn sàng. Mời bạn thao tác...<br><span style="color: var(--text-muted);">* Gợi ý: Ấn <b>Ctrl + Z</b> để hoàn tác thao tác vẽ đồ thị cuối cùng.</span></div>
+    </div>
+
+    <script>
+        function initResizer(resizerId, panelId, isRightSide) {
+            const resizer = document.getElementById(resizerId);
+            const panel = document.getElementById(panelId);
+            const network = document.getElementById('mynetwork');
+            let x = 0, w = 0;
+
+            const mouseDownHandler = function (e) {
+                x = e.clientX; w = panel.getBoundingClientRect().width;
+                document.addEventListener('mousemove', mouseMoveHandler); document.addEventListener('mouseup', mouseUpHandler);
+                resizer.classList.add('resizing'); document.body.style.cursor = 'col-resize';
+                network.style.pointerEvents = 'none'; document.body.style.userSelect = 'none';
+            };
+            const mouseMoveHandler = function (e) {
+                const dx = e.clientX - x; panel.style.width = isRightSide ? `${w - dx}px` : `${w + dx}px`;
+            };
+            const mouseUpHandler = function () {
+                resizer.classList.remove('resizing'); document.body.style.cursor = '';
+                network.style.pointerEvents = ''; document.body.style.userSelect = '';
+                document.removeEventListener('mousemove', mouseMoveHandler); document.removeEventListener('mouseup', mouseUpHandler);
+            };
+            resizer.addEventListener('mousedown', mouseDownHandler);
+        }
+        initResizer('resizer-left', 'panel', false);
+        initResizer('resizer-right', 'log-panel', true);
+
+        const API_URL = "http://localhost:8080";
+        const logDiv = document.getElementById("log");
+        var nodes = new vis.DataSet([]);
+        var edges = new vis.DataSet([]);
+        var container = document.getElementById('mynetwork');
+
+        let actionHistory = [];
+        let isColorOn = false; 
+        let lastCheckedAlgo = 'scc'; // Lưu lại thuật toán chạy cuối cùng để bật/tắt màu
+
+        const defaultNodeColor = '#3b82f6'; 
+        var options = {
+            nodes: { 
+                shape: 'circle', font: { size: 24, color: '#ffffff', face: '"Times New Roman", Times, serif', bold: true }, 
+                borderWidth: 3, color: { background: defaultNodeColor, border: '#1e3a8a', highlight: { background: '#60a5fa', border: '#ffffff' } }, 
+                margin: 15, widthConstraint: { minimum: 50 }, shadow: { enabled: true, color: 'rgba(0,0,0,0.4)', size: 10, x: 2, y: 2 }
+            },
+            edges: { arrows: 'to', color: { color: '#94a3b8', highlight: '#ffffff' }, width: 2.5, smooth: { type: 'continuous' } },
+            physics: { solver: 'barnesHut', barnesHut: { gravitationalConstant: -4000, springLength: 250, avoidOverlap: 1 }, stabilization: { iterations: 150 } },
+            interaction: { dragNodes: true, zoomView: true, hover: true }
+        };
+        var network = new vis.Network(container, { nodes: nodes, edges: edges }, options);
+
+        network.on("stabilizationIterationsDone", function () { network.setOptions({ physics: false }); });
+        network.on("dragStart", function () { network.setOptions({ physics: false }); });
+        window.addEventListener('load', () => { resetGraph(true); });
+
+        function log(msg) { logDiv.innerHTML += "\n\n" + msg; logDiv.scrollTop = logDiv.scrollHeight; }
+        function clearLog() { logDiv.innerHTML = "Hệ thống đã dọn dẹp lịch sử thông báo..."; }
+        function resetNodesColor() {
+            let updates = nodes.get().map(n => ({ id: n.id, color: { background: defaultNodeColor, border: '#1e3a8a' } }));
+            nodes.update(updates);
+        }
+        function validateInput(val) { let num = Math.floor(Math.abs(Number(val))); return (isNaN(num) || num <= 0) ? null : num; }
+
+        // Đồng bộ màu sắc của nút "Mắt" ở góc phải
+        function syncColorButtonState(isOn) {
+            isColorOn = isOn;
+            let btn = document.getElementById("btn-toggle-color");
+            if(btn) {
+                if (isOn) {
+                    btn.innerHTML = `<i class="fa-solid fa-eye-slash"></i>`;
+                    btn.style.background = '#059669'; // Sáng màu xanh báo hiệu đang có màu
+                    btn.title = "Tắt màu kết quả thuật toán";
+                } else {
+                    btn.innerHTML = `<i class="fa-solid fa-eye"></i>`;
+                    btn.style.background = 'var(--gray)';
+                    btn.title = "Bật lại màu kết quả thuật toán";
+                }
+            }
+        }
+
+        // Hàm xử lý khi bấm nút "Mắt"
+        async function toggleColor() {
+            if (isColorOn) {
+                resetNodesColor();
+                syncColorButtonState(false);
+                log(`<span style="color: #94a3b8;"><i class="fa-solid fa-eye-slash"></i> Đã ẩn màu hiển thị của thuật toán.</span>`);
+            } else {
+                await checkGraph(lastCheckedAlgo, true); // Chạy lại thuật toán gần nhất (ẩn log rác nếu cần)
+            }
+        }
+
+        async function addEdge() {
+            let uStr = document.getElementById("add-u").value.trim(); 
+            let vStr = document.getElementById("add-v").value.trim();
+            if (uStr === "" || vStr === "") return;
+
+            let u = validateInput(uStr); let v = validateInput(vStr);
+            if (u === null || v === null) return;
+            if (u === v) { log(`<span style="color: #f59e0b;"><i class="fa-solid fa-circle-exclamation"></i> Lỗi: Đồ thị không hỗ trợ cạnh khuyên (self-loop)!</span>`); return; }
+
+            let edgeId = `${u}-${v}`;
+            if (edges.get(edgeId)) { log(`<span style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Lỗi: Cạnh đã tồn tại!</span>`); return; }
+
+            try {
+                network.setOptions({ physics: true });
+                await fetch(`${API_URL}/add-edge?u=${u}&v=${v}`);
+                if (!nodes.get(u)) nodes.add({ id: u, label: String(u) });
+                if (!nodes.get(v)) nodes.add({ id: v, label: String(v) });
+                
+                edges.add({ id: edgeId, from: u, to: v });
+                actionHistory.push({ action: 'add_edge', u: u, v: v }); 
+                
+                resetNodesColor();
+                syncColorButtonState(false);
+                
+                log(`<span style="color: #34d399;"><i class="fa-solid fa-check"></i> Đã thêm cạnh: ${u} -> ${v}</span>`);
+                document.getElementById("add-u").focus(); document.getElementById("add-u").select(); 
+            } catch (e) { log(`<span style="color: #ef4444;"><i class="fa-solid fa-bug"></i> LỖI C++ Server!</span>`); }
+        }
+
+        async function deleteEdge() {
+            let uStr = document.getElementById("del-u").value.trim(); 
+            let vStr = document.getElementById("del-v").value.trim();
+            if (uStr === "" || vStr === "") return;
+
+            let u = validateInput(uStr); let v = validateInput(vStr);
+            if (u === null || v === null) return;
+
+            let edgeId = `${u}-${v}`;
+            if (!edges.get(edgeId)) { log(`<span style="color: #f59e0b;"><i class="fa-solid fa-circle-exclamation"></i> Lỗi: Cạnh không tồn tại!</span>`); return; }
+
+            try {
+                network.setOptions({ physics: true }); 
+                await fetch(`${API_URL}/remove-edge?u=${u}&v=${v}`);
+                edges.remove(edgeId);
+                actionHistory.push({ action: 'del_edge', u: u, v: v }); 
+                
+                resetNodesColor();
+                syncColorButtonState(false);
+
+                log(`<span style="color: #f87171;"><i class="fa-solid fa-trash-can"></i> Đã xóa cạnh: ${u} -> ${v}</span>`);
+                document.getElementById("del-u").focus(); document.getElementById("del-u").select();
+            } catch (e) { log(`<span style="color: #ef4444;"><i class="fa-solid fa-bug"></i> LỖI C++ Server!</span>`); }
+        }
+
+        async function deleteNode() {
+            let nStr = document.getElementById("del-node").value.trim();
+            if (nStr === "") return;
+
+            let n = validateInput(nStr);
+            if (n === null) return;
+
+            if (!nodes.get(n)) { log(`<span style="color: #f59e0b;"><i class="fa-solid fa-circle-exclamation"></i> Lỗi: Đỉnh không tồn tại!</span>`); return; }
+
+            try {
+                network.setOptions({ physics: true });
+                
+                let connectedEdgesIds = network.getConnectedEdges(n);
+                let savedEdges = connectedEdgesIds.map(id => {
+                    let e = edges.get(id); return { u: e.from, v: e.to };
+                });
+
+                await fetch(`${API_URL}/remove-vertex?u=${n}`);
+                edges.remove(connectedEdgesIds);
+                nodes.remove(n);
+                
+                actionHistory.push({ action: 'del_node', node: n, edges: savedEdges }); 
+
+                resetNodesColor();
+                syncColorButtonState(false);
+
+                log(`<span style="color: #f87171;"><i class="fa-solid fa-bomb"></i> Đã xóa đỉnh: ${n}</span>`);
+                document.getElementById("del-node").focus(); document.getElementById("del-node").select();
+            } catch (e) { log(`<span style="color: #ef4444;"><i class="fa-solid fa-bug"></i> LỖI C++ Server!</span>`); }
+        }
+
+        async function undoAction() {
+            if (actionHistory.length === 0) {
+                log(`<span style="color: var(--text-muted);"><i class="fa-solid fa-rotate-left"></i> Không có thao tác nào để hoàn tác.</span>`);
+                return;
+            }
+
+            let last = actionHistory.pop();
+            network.setOptions({ physics: true });
+
+            try {
+                if (last.action === 'add_edge') {
+                    await fetch(`${API_URL}/remove-edge?u=${last.u}&v=${last.v}`);
+                    edges.remove(`${last.u}-${last.v}`);
+                    log(`<span style="color: var(--warning);"><i class="fa-solid fa-rotate-left"></i> Hoàn tác: Đã XÓA cạnh ${last.u} -> ${last.v}</span>`);
+                } 
+                else if (last.action === 'del_edge') {
+                    await fetch(`${API_URL}/add-edge?u=${last.u}&v=${last.v}`);
+                    if (!nodes.get(last.u)) nodes.add({ id: last.u, label: String(last.u) });
+                    if (!nodes.get(last.v)) nodes.add({ id: last.v, label: String(last.v) });
+                    edges.add({ id: `${last.u}-${last.v}`, from: last.u, to: last.v });
+                    log(`<span style="color: var(--warning);"><i class="fa-solid fa-rotate-left"></i> Hoàn tác: Đã KHÔI PHỤC cạnh ${last.u} -> ${last.v}</span>`);
+                } 
+                else if (last.action === 'del_node') {
+                    await fetch(`${API_URL}/add-vertex?u=${last.node}`);
+                    if (!nodes.get(last.node)) nodes.add({ id: last.node, label: String(last.node) });
+
+                    for (let edge of last.edges) {
+                        await fetch(`${API_URL}/add-edge?u=${edge.u}&v=${edge.v}`);
+                        if (!nodes.get(edge.u)) nodes.add({ id: edge.u, label: String(edge.u) });
+                        if (!nodes.get(edge.v)) nodes.add({ id: edge.v, label: String(edge.v) });
+                        if (!edges.get(`${edge.u}-${edge.v}`)) {
+                            edges.add({ id: `${edge.u}-${edge.v}`, from: edge.u, to: edge.v });
+                        }
+                    }
+                    log(`<span style="color: var(--warning);"><i class="fa-solid fa-rotate-left"></i> Hoàn tác: Đã KHÔI PHỤC đỉnh ${last.node} và các cạnh liên quan</span>`);
+                }
+                resetNodesColor();
+                syncColorButtonState(false);
+            } catch (e) { log(`<span style="color: #ef4444;">Lỗi khi hoàn tác thao tác!</span>`); }
+        }
+
+        async function checkGraph(type, isToggleRecheck = false) {
+            let algo = document.getElementById("algoMethod").value;
+            let endpoint = type === 'scc' ? 'check-scc' : 'check-orientable';
+            
+            lastCheckedAlgo = type; // Lưu lại thuật toán vừa chạy
+
+            try {
+                let response = await fetch(`${API_URL}/${endpoint}?method=${algo}`);
+                let resultText = await response.text();
+                
+                // Nếu chỉ là ấn bật lại màu thì không cần in log lại quá dài
+                if (!isToggleRecheck) {
+                    log(`<b style="color: #f8fafc;">Kết quả trả về:</b>\n` + resultText); 
+                } else {
+                    log(`<span style="color: #34d399;"><i class="fa-solid fa-eye"></i> Đã bật lại màu phân tích.</span>`);
+                }
+
+                let isSuccess = resultText.includes("[+]");
+                if (!resultText.includes("[+]") && !resultText.includes("[-]")) {
+                    let textLower = resultText.toLowerCase();
+                    isSuccess = type === 'scc' 
+                        ? textLower.includes("liên thông mạnh") && !textLower.includes("không liên thông")
+                        : textLower.includes("định chiều được") && !textLower.includes("không định chiều");
+                }
+
+                let targetColor = '#ef4444'; 
+                if (isSuccess) { targetColor = type === 'scc' ? '#10b981' : '#8b5cf6'; }
+
+                let updates = nodes.get().map(n => ({ id: n.id, color: { background: targetColor, border: '#ffffff' } }));
+                nodes.update(updates);
+                
+                syncColorButtonState(true); // Bật màu nút Mắt
+
+            } catch (e) { log(`<span style="color: #ef4444;"><i class="fa-solid fa-plug-circle-xmark"></i> Mất kết nối tới C++.</span>`); }
+        }
+
+        async function resetGraph(isSilent = false) {
+            try {
+                network.setOptions({ physics: true });
+                await fetch(`${API_URL}/reset`);
+                nodes.clear(); edges.clear(); actionHistory = []; 
+                syncColorButtonState(false); 
+                if (!isSilent) log(`<span style="color: #94a3b8;"><i class="fa-solid fa-broom"></i> Đã dọn dẹp toàn bộ đồ thị.</span>`);
+            } catch (e) { if (!isSilent) log(`<span style="color: #ef4444;"><i class="fa-solid fa-plug-circle-xmark"></i> Lỗi kết nối C++.</span>`); }
+        }
+
+        function fitGraph() {
+            network.fit({ animation: { duration: 800, easingFunction: 'easeInOutQuad' } });
+            log(`<span style="color: #0ea5e9;"><i class="fa-solid fa-compress"></i> Đã căn chỉnh góc nhìn đồ thị.</span>`);
+        }
+
+        function setupEnterKey(inputIds, actionFunction) {
+            inputIds.forEach(id => {
+                let el = document.getElementById(id);
+                if(el) { el.addEventListener("keypress", function(event) { if (event.key === "Enter") { event.preventDefault(); actionFunction(); }}); }
+            });
+        }
+        setupEnterKey(["add-u", "add-v"], addEdge); setupEnterKey(["del-u", "del-v"], deleteEdge); setupEnterKey(["del-node"], deleteNode);
+
+        document.querySelectorAll('input[type="number"]').forEach(input => { input.addEventListener("focus", function() { this.select(); }); });
+
+        const inputGroups = [ ["add-u", "add-v"], ["del-u", "del-v"], ["del-node"] ];
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+                let activeElement = document.activeElement;
+                if (activeElement && activeElement.tagName === "INPUT") {
+                    let activeId = activeElement.id;
+                    let currentGroup = inputGroups.find(group => group.includes(activeId));
+                    if (currentGroup && currentGroup.length > 1) {
+                        event.preventDefault(); 
+                        let currentIndex = currentGroup.indexOf(activeId);
+                        let nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % currentGroup.length : (currentIndex - 1 + currentGroup.length) % currentGroup.length;
+                        document.getElementById(currentGroup[nextIndex]).focus();
+                    }
+                }
+            }
+
+            if (event.ctrlKey && event.key.toLowerCase() === 'z') {
+                event.preventDefault(); undoAction();
+            }
+            else if (event.altKey && !event.ctrlKey && !event.shiftKey) {
+                let key = event.key.toLowerCase();
+                if (key === 's') { event.preventDefault(); checkGraph('scc'); } 
+                else if (key === 'd') { event.preventDefault(); checkGraph('orientable'); } 
+                else if (key === 'f') { event.preventDefault(); fitGraph(); }
+                else if (key === 'x') { event.preventDefault(); resetGraph(); }
+            }
+        });
+    </script>
+</body>
+</html>
