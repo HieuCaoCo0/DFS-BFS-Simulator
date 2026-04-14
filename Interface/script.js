@@ -4,14 +4,15 @@
     const canvas = document.getElementById('graphCanvas');
     const ctx = canvas.getContext('2d');
 
+    // Chỉnh màu tươi và bắt mắt hơn để phù hợp với hiệu ứng Glow
     const COL = {
-        unvisited: '#b8d4f0',
-        active: '#f5d76e',
-        visited: '#a8e6a8',
-        path: '#2d8a54',
-        bridge: '#c0392b',
-        edge: '#444',
-        edgeHighlight: '#e74c3c',
+        unvisited: '#3b82f6', // Xanh biển nhạt
+        active: '#fbbf24',    // Vàng neon
+        visited: '#10b981',   // Xanh ngọc dạ quang
+        path: '#06b6d4',      // Xanh lơ (cyan)
+        bridge: '#ef4444',    // Đỏ cờ
+        edge: '#94a3b8',      // Xám viền
+        edgeHighlight: '#ef4444',
     };
 
     let vertices = [];
@@ -24,6 +25,12 @@
     let playTimer = null;
     let lastStructureRows = [];
     let lastResultRows = [];
+
+    // Biến dùng để loop animation lắc lư
+    let currentSnap = null;
+    
+    // --- Quản lý Zoom (Khai báo duy nhất tại đây) ---
+    let zoomLevel = 1.0; 
 
     const $ = (id) => document.getElementById(id);
 
@@ -39,7 +46,6 @@
         return u <= v ? [u, v] : [v, u];
     }
 
-    /** @param {boolean} asUndirected - mọi cạnh coi như vô hướng (cho cầu / Robbins) */
     function buildAdj(asUndirected) {
         const adj = {};
         vertices.forEach((v) => (adj[v.id] = []));
@@ -121,6 +127,7 @@
     function fillSelects() {
         const ss = $('startSelect');
         const es = $('endSelect');
+        if (!ss || !es) return;
         ss.innerHTML = '';
         es.innerHTML = '';
         vertices.forEach((v) => {
@@ -140,42 +147,31 @@
     }
 
     function applyDirectedFromUI() {
+        const mode = $('modeSelect') ? $('modeSelect').value : 'traverse';
+        if (mode === 'orient') {
+            // "Định chiều được" ở đây: đồ thị VÔ HƯỚNG có thể định hướng để trở thành liên thông mạnh hay không (Robbins).
+            // Vì vậy luôn ép về vô hướng trong chế độ này.
+            directed = false;
+            const ds = $('directedSelect');
+            if (ds) ds.value = 'undirected';
+            return;
+        }
         directed = $('directedSelect').value === 'directed';
     }
 
-    function drawArrow(x1, y1, x2, y2) {
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const len = Math.hypot(dx, dy) || 1;
-        const ux = dx / len;
-        const uy = dy / len;
-        const shorten = 22;
-        const sx = x2 - ux * shorten;
-        const sy = y2 - uy * shorten;
-        const fx = x1 + ux * shorten;
-        const fy = y1 + uy * shorten;
-        ctx.beginPath();
-        ctx.moveTo(fx, fy);
-        ctx.lineTo(sx, sy);
-        ctx.stroke();
-        const ah = 10;
-        const aw = 6;
-        const bx = sx;
-        const by = sy;
-        const lx = bx - ux * ah - uy * aw;
-        const ly = by - uy * ah + ux * aw;
-        const rx = bx - ux * ah + uy * aw;
-        const ry = by - uy * ah - ux * aw;
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.lineTo(lx, ly);
-        ctx.lineTo(rx, ry);
-        ctx.closePath();
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.fill();
+    function getWobblePos(v) {
+        if (!v) return { x: 0, y: 0 };
+        if (v.id === dragId) return { x: v.x, y: v.y };
+
+        // Snap to whole pixels to avoid shimmering/blur from sub-pixel jitter.
+        // (The visual "wobble" remains, but the graph looks crisper.)
+        const time = Date.now() / 1500;
+        const hash = v.id.charCodeAt(0) || 0;
+        const x = v.x + Math.sin(time + hash) * 1;
+        const y = v.y + Math.cos(time + hash * 2) * 1;
+        return { x: Math.round(x), y: Math.round(y) };
     }
 
-    /** Cạnh e có trùng hướng duyệt (u→v) hoặc cùng cặp đỉnh (vô hướng) với highlight không? */
     function edgeIsHighlighted(e, h) {
         if (!h || h.u == null || h.v == null) return false;
         if (directed) {
@@ -190,55 +186,115 @@
         const a = vertexById(e.u);
         const b = vertexById(e.v);
         if (!a || !b) return;
+
+        const pA = getWobblePos(a);
+        const pB = getWobblePos(b);
+
+        const isCurved = directed && edges.some(edge => edge.u === e.v && edge.v === e.u);
+
+        let color = COL.edge;
+        // CHỈNH SỬA: Tăng độ dày cạnh lên 2 để sắc nét, không bị mờ
+        let width = 2; 
+        let isDashed = false;
+
         if (snap && snap.hiddenEdge && edgeIsHighlighted(e, snap.hiddenEdge)) {
-            ctx.strokeStyle = '#b0b0b8';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([5, 5]);
-            if (directed) {
-                drawArrow(a.x, a.y, b.x, b.y);
-            } else {
-                ctx.beginPath();
-                ctx.moveTo(a.x, a.y);
-                ctx.lineTo(b.x, b.y);
-                ctx.stroke();
+            color = '#475569';
+            isDashed = true;
+        } else {
+            const hl = snap && snap.highlightEdge && edgeIsHighlighted(e, snap.highlightEdge);
+            const bridge = snap && snap.bridges && snap.bridges.some((p) => (p[0] === e.u && p[1] === e.v) || (p[0] === e.v && p[1] === e.u));
+            if (hl) {
+                color = COL.edgeHighlight;
+                width = 4;
+            } else if (bridge) {
+                color = COL.bridge;
+                width = 3;
             }
-            ctx.setLineDash([]);
-            return;
         }
-        const hl = snap && snap.highlightEdge && edgeIsHighlighted(e, snap.highlightEdge);
-        const bridge =
-            snap &&
-            snap.bridges &&
-            snap.bridges.some((p) => (p[0] === e.u && p[1] === e.v) || (p[0] === e.v && p[1] === e.u));
-        if (hl) {
-            ctx.strokeStyle = COL.edgeHighlight;
-            ctx.lineWidth = 4;
-        } else if (bridge) {
-            ctx.strokeStyle = COL.bridge;
-            ctx.lineWidth = 3;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(isDashed ? [5, 5] : []);
+
+        const dx = pB.x - pA.x;
+        const dy = pB.y - pA.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = dx / len;
+        const ny = dy / len;
+
+        const r = 22; 
+        const sx = pA.x + nx * r;
+        const sy = pA.y + ny * r;
+        const ex = pB.x - nx * r;
+        const ey = pB.y - ny * r;
+
+        let cpX = 0, cpY = 0; 
+        let headDx, headDy;
+
+        ctx.beginPath();
+        if (isCurved) {
+            const curveOffset = 30;
+            const midX = (sx + ex) / 2;
+            const midY = (sy + ey) / 2;
+            const perpX = -ny;
+            const perpY = nx;
+            
+            cpX = midX + perpX * curveOffset;
+            cpY = midY + perpY * curveOffset;
+            
+            ctx.moveTo(sx, sy);
+            ctx.quadraticCurveTo(cpX, cpY, ex, ey);
+            
+            const t = 1; 
+            headDx = 2 * (1 - t) * (cpX - sx) + 2 * t * (ex - cpX);
+            headDy = 2 * (1 - t) * (cpY - sy) + 2 * t * (ey - cpY);
         } else {
-            ctx.strokeStyle = COL.edge;
-            ctx.lineWidth = 1.5;
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(ex, ey);
+            headDx = dx;
+            headDy = dy;
         }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
         if (directed) {
-            drawArrow(a.x, a.y, b.x, b.y);
-        } else {
+            const hLen = Math.hypot(headDx, headDy) || 1;
+            const hnx = headDx / hLen;
+            const hny = headDy / hLen;
+
+            const ah = 12;
+            const aw = 7;
+            const lx = ex - hnx * ah - hny * aw;
+            const ly = ey - hny * ah + hnx * aw;
+            const rx = ex - hnx * ah + hny * aw;
+            const ry = ey - hny * ah - hnx * aw;
+
             ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
+            ctx.moveTo(ex, ey);
+            ctx.lineTo(lx, ly);
+            ctx.lineTo(rx, ry);
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
         }
     }
 
     function hslComponent(k, total) {
         const h = Math.round((360 * k) / Math.max(total, 1)) % 360;
-        return `hsl(${h}, 72%, 62%)`;
+        return `hsl(${h}, 80%, 50%)`;
     }
 
     function drawGraph(snap) {
         const w = canvas.width;
         const h = canvas.height;
         ctx.clearRect(0, 0, w, h);
+
+        ctx.save();
+        const cx = w / 2;
+        const cy = h / 2;
+        ctx.translate(cx, cy);
+        ctx.scale(zoomLevel, zoomLevel);
+        ctx.translate(-cx, -cy);
 
         const nc = (snap && snap.nodeColor) || {};
         const comp = (snap && snap.componentOf) || null;
@@ -255,30 +311,40 @@
         });
 
         vertices.forEach((v) => {
-            let fill = COL.unvisited;
+            let baseColor = COL.unvisited;
             const st = nc[v.id] || 'unvisited';
-            if (st === 'active') fill = COL.active;
-            else if (st === 'visited') fill = COL.visited;
-            else if (st === 'path') fill = COL.path;
-            else if (st === 'unvisited') fill = COL.unvisited;
+            if (st === 'active') baseColor = COL.active;
+            else if (st === 'visited') baseColor = COL.visited;
+            else if (st === 'path') baseColor = COL.path;
+            else if (st === 'unvisited') baseColor = COL.unvisited;
             if (comp && comp[v.id] != null) {
                 const total = snap.componentCount || 1;
-                fill = hslComponent(comp[v.id], total);
+                baseColor = hslComponent(comp[v.id], total);
             }
 
+            const p = getWobblePos(v); 
+            const radius = 18;
+
+            // VẼ ĐỈNH (Tắt toàn bộ hiệu ứng bóng)
             ctx.beginPath();
-            ctx.arc(v.x, v.y, 18, 0, Math.PI * 2);
-            ctx.fillStyle = fill;
-            ctx.strokeStyle = '#222';
-            ctx.lineWidth = 2;
-            ctx.fill();
+            ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = baseColor;
+            ctx.fill(); // Không dùng shadowColor và shadowBlur nữa
+            
+            // Viền đỉnh (Tăng độ nét)
+            ctx.strokeStyle = '#1e293b'; 
+            ctx.lineWidth = 1.5; 
             ctx.stroke();
-            ctx.fillStyle = '#111';
-            ctx.font = 'bold 13px Segoe UI, sans-serif';
+
+            // VẼ CHỮ (Tắt toàn bộ hiệu ứng bóng)
+            ctx.fillStyle = '#ffffff'; 
+            ctx.font = 'bold 15px "Times New Roman", Times, serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(v.id, v.x, v.y);
+            ctx.fillText(v.id, p.x, p.y); // Không dùng shadowColor và shadowBlur nữa
         });
+
+        ctx.restore();
     }
 
     function snapshotBase(msg, vertexLabel) {
@@ -395,7 +461,6 @@
         const adj = buildAdj(false);
         const visited = {};
         const parent = {};
-        const stackVis = [];
         let stepNum = 0;
 
         function snap(msg, cur, stack, highlightEdge) {
@@ -542,7 +607,6 @@
         return { steps, comps };
     }
 
-    /** Đồ thị chuyển vị G^T (chỉ cạnh có hướng). */
     function buildTransposeAdj() {
         const adj = buildAdj(false);
         const rev = {};
@@ -555,10 +619,6 @@
         return rev;
     }
 
-    /**
-     * Kosaraju–Sharir: GĐ1 DFS trên G → stack L (thứ tự hoàn thành);
-     * GĐ2 lấy đỉnh từ cuối L, BFS trên G^T để gom từng TPLTM.
-     */
     function buildKosarajuSteps() {
         const steps = [];
         const adj = buildAdj(false);
@@ -877,7 +937,6 @@
         return { steps, bridges, orientable, weakComp: wcc };
     }
 
-    /** Danh sách cặp đỉnh vô hướng duy nhất (nền cho Robbins / cầu). */
     function getUniqueUndirectedEdges() {
         const seen = new Set();
         const out = [];
@@ -901,7 +960,6 @@
         return c;
     }
 
-    /** Liệu từ `start` có tới `goal` trên đồ thị vô hướng `adj` (BFS). */
     function reachableBFSUndirected(adj, start, goal) {
         if (start === goal) return true;
         const seen = { [start]: true };
@@ -921,21 +979,16 @@
         return false;
     }
 
-    /** Cầu: với mỗi cạnh e, đồ thị G \\ {e} không liên thông giữa hai đầu mút ⇔ e là cầu. */
     function computeBridgesBFS() {
         const fullAdj = buildAdj(true);
         const bridges = [];
         getUniqueUndirectedEdges().forEach(([a, b]) => {
-            const adj = adjWithoutUndirectedEdge(fullAdj, a, b);
-            if (!reachableBFSUndirected(adj, a, b)) bridges.push([a, b]);
+            const tempAdj = adjWithoutUndirectedEdge(fullAdj, a, b);
+            if (!reachableBFSUndirected(tempAdj, a, b)) bridges.push([a, b]);
         });
         return bridges;
     }
 
-    /**
-     * Tìm cầu bằng BFS: với từng cạnh {a,b}, tạm loại mọi liên kết a—b,
-     * chạy BFS từ a; nếu không tới b thì đó là cầu. Đúng với đồ thị đơn / đa cạnh (bỏ hết song song).
-     */
     function buildBridgeStepsBFS() {
         const steps = [];
         const fullAdj = buildAdj(true);
@@ -944,8 +997,6 @@
         const pairList = getUniqueUndirectedEdges();
 
         function colorBFS(seen, activeId, qArr) {
-            const inQ = {};
-            qArr.forEach((id) => (inQ[id] = true));
             const nc = {};
             vertices.forEach((v) => {
                 const id = v.id;
@@ -1110,31 +1161,57 @@
         tbody.innerHTML = '';
         const title = $('structureTitle');
         const col2 = $('structureCol2');
+        
+        let noteEl = $('structureNote');
+        if (!noteEl) {
+            noteEl = document.createElement('div');
+            noteEl.id = 'structureNote';
+            noteEl.style.fontSize = '0.9rem';
+            noteEl.style.color = '#e2e8f0';
+            noteEl.style.marginBottom = '12px';
+            noteEl.style.lineHeight = '1.4';
+            noteEl.style.padding = '10px';
+            noteEl.style.backgroundColor = 'rgba(251, 191, 36, 0.1)'; 
+            noteEl.style.borderLeft = '3px solid #facc15';           
+            noteEl.style.borderRadius = '5px';
+            title.parentNode.insertBefore(noteEl, title.nextSibling);
+        }
+
         if (mode === 'traverse' && algo === 'bfs') {
             title.textContent = 'Hàng đợi (Queue)';
             col2.textContent = 'Hàng đợi';
+            noteEl.style.display = 'none';
         } else if (mode === 'traverse') {
-            title.textContent = 'Ngăn xếp (Stack — gợi ý DFS)';
+            title.textContent = 'Ngăn xếp (Stack)';
             col2.textContent = 'Stack';
+            noteEl.style.display = 'none';
         } else if (mode === 'orient') {
-            if ($('orientAlgoSelect').value === 'bfs') {
-                title.textContent = 'Hàng đợi BFS (thử từng cạnh)';
-                col2.textContent = 'Queue / ghi chú';
-            } else {
-                title.textContent = 'Các bước DFS (tìm cầu)';
-                col2.textContent = 'Ghi chú';
-            }
+            const isBFS = $('orientAlgoSelect').value === 'bfs';
+            title.textContent = isBFS ? 'Hàng đợi BFS (thử từng cạnh)' : 'Các bước DFS (tìm cầu)';
+            col2.textContent = 'Ghi chú';
+            noteEl.style.display = 'block';
+            noteEl.innerHTML = isBFS 
+                ? '💡 <strong style="color:#3b82f6">Queue:</strong> Dùng để lan truyền BFS, kiểm tra xem còn đường đi giữa u và v khi giả lập bỏ đi cạnh (u,v) hay không.'
+                : '💡 <strong style="color:#3b82f6">Đệ quy DFS:</strong> Đi sâu vào đồ thị để cập nhật thời gian thăm (disc) và giá trị low, qua đó xác định Cầu.';
         } else if (mode === 'kosaraju') {
             title.textContent = 'Kosaraju: DFS stack / L + BFS queue (G^T)';
             col2.textContent = 'Cấu trúc';
+            noteEl.style.display = 'block';
+            noteEl.innerHTML = '💡 <strong style="color:#3b82f6">DFS Stack:</strong> Phục vụ đệ quy GĐ1.<br>💡 <strong style="color:#fbbf24">Mảng L:</strong> Lưu thứ tự hoàn thành của các đỉnh (chờ GĐ2).<br>💡 <strong style="color:#10b981">BFS Queue:</strong> Lan truyền trên G^T để gom nhóm TPLTM.';
         } else {
             title.textContent = 'Stack Tarjan (TPLTM)';
             col2.textContent = 'Stack';
+            noteEl.style.display = 'block';
+            noteEl.innerHTML = '💡 <strong style="color:#3b82f6">Stack:</strong> Lưu trữ các đỉnh thuộc một TPLTM tiềm năng. Đỉnh chỉ được Pop ra khi phát hiện nó là gốc của TPLTM (low = index).';
         }
 
         lastStructureRows.forEach((row) => {
             const tr = document.createElement('tr');
-            tr.innerHTML = '<td>' + row.step + '</td><td>' + row.val + '</td>';
+            if (row.isDivider) {
+                tr.innerHTML = `<td colspan="2" style="text-align: center; color: #facc15; background: rgba(251, 191, 36, 0.15); font-weight: bold; letter-spacing: 1px; padding: 12px; border-top: 2px dashed #facc15; border-bottom: 2px dashed #facc15; border-radius: 6px;">${row.val}</td>`;
+            } else {
+                tr.innerHTML = `<td>${row.step}</td><td>${row.val}</td>`;
+            }
             tbody.appendChild(tr);
         });
     }
@@ -1199,15 +1276,28 @@
         if (!steps.length) return;
         stepIndex = Math.max(0, Math.min(i, steps.length - 1));
         const snap = steps[stepIndex];
-        drawGraph(snap);
+        
+        currentSnap = snap; 
         updateInfoPanel(snap);
 
         lastStructureRows = [];
         const mode = $('modeSelect').value;
         const algo = $('algoSelect').value;
+        
         for (let si = 0; si <= stepIndex; si++) {
             const s = steps[si];
             if (!s) continue;
+            
+            if (mode === 'kosaraju' && si > 0) {
+                const prevS = steps[si - 1];
+                if (prevS.kosPhase === 1 && s.kosPhase === 2) {
+                    lastStructureRows.push({
+                        isDivider: true,
+                        val: '✨ CHUYỂN GIAI ĐOẠN 2: LẬT NGƯỢC ĐỒ THỊ (G^T) ✨'
+                    });
+                }
+            }
+
             const stepLabel = s.stepNum != null ? String(s.stepNum) : String(si);
             if (mode === 'traverse' && algo === 'bfs' && Array.isArray(s.queue)) {
                 lastStructureRows.push({ step: stepLabel, val: '[' + s.queue.join(', ') + ']' });
@@ -1222,6 +1312,10 @@
                 if (Array.isArray(s.finishStack) && s.finishStack.length) bits.push('L:[' + s.finishStack.join(', ') + ']');
                 if (Array.isArray(s.remainingFinish) && s.remainingFinish.length) bits.push('L còn:[' + s.remainingFinish.join(', ') + ']');
                 if (Array.isArray(s.queue) && s.queue.length) bits.push('BFS:[' + s.queue.join(', ') + ']');
+                
+                if (s.msg && s.msg.includes('Tiếp theo: G^T')) continue;
+                if (s.msg && s.msg.includes('BẮT ĐẦU GIAI ĐOẠN 2')) continue;
+                
                 const val = bits.length ? bits.join(' | ') : (s.msg || '—');
                 if (val && val !== '—') lastStructureRows.push({ step: stepLabel, val: val });
                 else if (s.msg) {
@@ -1288,7 +1382,7 @@
             if (!directed) {
                 alert('TPLTM áp dụng cho đồ thị có hướng. Hãy chọn "Có hướng" hoặc dùng chế độ định chiều / duyệt.');
                 setStatus('Lỗi cấu hình');
-                drawGraph(null);
+                currentSnap = null;
                 return;
             }
             const built = buildTarjanSteps();
@@ -1298,12 +1392,14 @@
             if (!directed) {
                 alert('TPLTM áp dụng cho đồ thị có hướng. Hãy chọn "Có hướng".');
                 setStatus('Lỗi cấu hình');
-                drawGraph(null);
+                currentSnap = null;
                 return;
             }
             const built = buildKosarajuSteps();
             steps = built.steps;
         } else if (mode === 'orient') {
+            // Đảm bảo đang ở vô hướng cho bài toán "định chiều được hay không"
+            directed = false;
             const oa = $('orientAlgoSelect').value;
             $('questLabel').textContent =
                 oa === 'bfs' ? 'Định chiều (BFS — thử từng cạnh)' : 'Định chiều (DFS — low)';
@@ -1351,7 +1447,7 @@
         stepIndex = 0;
         if (steps.length) showStep(0);
         else {
-            drawGraph(null);
+            currentSnap = null;
             updateInfoPanel(null);
         }
         setStatus('Ready');
@@ -1367,14 +1463,15 @@
             comps.forEach((c, i) => c.forEach((id) => (snap.componentOf[id] = i)));
             snap.componentCount = comps.length;
             vertices.forEach((v) => (snap.nodeColor[v.id] = 'visited'));
-            drawGraph(snap);
+            currentSnap = snap;
             $('infoScc').textContent = String(comps.length);
             renderResultTable(mode, snap);
             setStatus('Đã áp màu TPLTM');
             return;
         }
         if (mode === 'orient') {
-            const { bridges, orientable, weakComp } = (function () {
+            directed = false;
+            const res = (function () {
                 const wcc = weakComponentCount();
                 if ($('orientAlgoSelect').value === 'bfs') {
                     const br = computeBridgesBFS();
@@ -1403,12 +1500,12 @@
                 return { bridges, orientable: wcc === 1 && bridges.length === 0, weakComp: wcc };
             })();
             const snap = snapshotBase('', '—');
-            snap.bridges = bridges;
-            snap.orientable = orientable;
+            snap.bridges = res.bridges;
+            snap.orientable = res.orientable;
             vertices.forEach((v) => (snap.nodeColor[v.id] = 'visited'));
-            drawGraph(snap);
-            $('infoWeak').textContent = String(weakComp);
-            $('infoOrient').textContent = orientable ? 'Có (Robbins)' : 'Không';
+            currentSnap = snap;
+            $('infoWeak').textContent = String(res.weakComp);
+            $('infoOrient').textContent = res.orientable ? 'Có (Robbins)' : 'Không';
             renderResultTable('orient', snap);
             setStatus('Đã kiểm tra cầu / định chiều');
             return;
@@ -1417,22 +1514,70 @@
         if (steps.length) showStep(steps.length - 1);
     }
 
-    function hitVertex(mx, my) {
-        for (let i = vertices.length - 1; i >= 0; i--) {
-            const v = vertices[i];
-            if (Math.hypot(mx - v.x, my - v.y) <= 20) return v.id;
-        }
-        return null;
+    // --- ZOOM LOGIC ---
+    const canvasWrap = document.querySelector('.canvas-wrap');
+    if (canvasWrap) {
+        canvasWrap.style.position = 'relative';
+        const zoomContainer = document.createElement('div');
+        zoomContainer.style.position = 'absolute';
+        zoomContainer.style.bottom = '15px';
+        zoomContainer.style.right = '15px';
+        zoomContainer.style.display = 'flex';
+        zoomContainer.style.flexDirection = 'column';
+        zoomContainer.style.gap = '8px';
+
+        const btnZoomIn = document.createElement('button');
+        btnZoomIn.className = 'btn';
+        btnZoomIn.innerHTML = '➕';
+        btnZoomIn.style.padding = '6px 12px';
+        btnZoomIn.title = 'Phóng to';
+        btnZoomIn.onclick = () => { zoomLevel = Math.min(zoomLevel * 1.2, 3.0); };
+
+        const btnZoomOut = document.createElement('button');
+        btnZoomOut.className = 'btn';
+        btnZoomOut.innerHTML = '➖';
+        btnZoomOut.style.padding = '6px 12px';
+        btnZoomOut.title = 'Thu nhỏ';
+        btnZoomOut.onclick = () => { zoomLevel = Math.max(zoomLevel / 1.2, 0.3); };
+
+        zoomContainer.appendChild(btnZoomIn);
+        zoomContainer.appendChild(btnZoomOut);
+        canvasWrap.appendChild(zoomContainer);
     }
+
+    canvas.addEventListener('wheel', (ev) => {
+        ev.preventDefault();
+        if (ev.deltaY < 0) {
+            zoomLevel = Math.min(zoomLevel * 1.1, 3.0);
+        } else {
+            zoomLevel = Math.max(zoomLevel / 1.1, 0.3);
+        }
+    });
 
     function canvasPos(ev) {
         const r = canvas.getBoundingClientRect();
         const scaleX = canvas.width / r.width;
         const scaleY = canvas.height / r.height;
+        
+        const lx = (ev.clientX - r.left) * scaleX;
+        const ly = (ev.clientY - r.top) * scaleY;
+        
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        
         return {
-            x: (ev.clientX - r.left) * scaleX,
-            y: (ev.clientY - r.top) * scaleY,
+            x: (lx - cx) / zoomLevel + cx,
+            y: (ly - cy) / zoomLevel + cy,
         };
+    }
+
+    function hitVertex(mx, my) {
+        for (let i = vertices.length - 1; i >= 0; i--) {
+            const v = vertices[i];
+            const p = getWobblePos(v); 
+            if (Math.hypot(mx - p.x, my - p.y) <= 20) return v.id;
+        }
+        return null;
     }
 
     canvas.addEventListener('mousedown', (ev) => {
@@ -1446,8 +1591,6 @@
         if (v) {
             v.x = Math.max(22, Math.min(canvas.width - 22, x));
             v.y = Math.max(22, Math.min(canvas.height - 22, y));
-            const snap = steps.length ? steps[stepIndex] : null;
-            drawGraph(snap);
         }
     });
     window.addEventListener('mouseup', () => {
@@ -1468,8 +1611,9 @@
         });
         fillSelects();
         steps = [];
-        drawGraph(null);
+        currentSnap = null;
         $('infoWeak').textContent = String(weakComponentCount());
+        $('addVertexInput').value = ''; 
     });
 
     $('btnDelVertex').addEventListener('click', () => {
@@ -1479,8 +1623,9 @@
         edges = edges.filter((e) => e.u !== id && e.v !== id);
         fillSelects();
         steps = [];
-        drawGraph(null);
+        currentSnap = null;
         $('infoWeak').textContent = String(weakComponentCount());
+        $('delVertexInput').value = '';
     });
 
     $('btnAddEdge').addEventListener('click', () => {
@@ -1509,8 +1654,11 @@
         }
         edges.push({ u, v });
         steps = [];
-        drawGraph(null);
+        currentSnap = null;
         $('infoWeak').textContent = String(weakComponentCount());
+        $('edgeU').value = '';
+        $('edgeV').value = '';
+        $('edgeU').focus();
     });
 
     $('btnDelEdge').addEventListener('click', () => {
@@ -1527,13 +1675,14 @@
             edges = edges.filter((e) => !(e.u === u && e.v === v));
         }
         steps = [];
-        drawGraph(null);
+        currentSnap = null;
         $('infoWeak').textContent = String(weakComponentCount());
+        $('edgeU').value = '';
+        $('edgeV').value = '';
     });
 
     $('btnLayout').addEventListener('click', () => {
         defaultLayout();
-        drawGraph(steps.length ? steps[stepIndex] : null);
     });
 
     $('btnUpdateWeak').addEventListener('click', () => {
@@ -1556,7 +1705,6 @@
         el.classList.toggle('is-orient-only-hidden', !show);
     }
 
-    /** Tarjan / Kosaraju / định chiều: thay dropdown bằng mô tả thuật toán tương ứng */
     function syncAlgoTraversePanel() {
         const m = $('modeSelect').value;
         const wrap = $('algoTraverseWrap');
@@ -1581,11 +1729,25 @@
         if (m === 'scc') {
             $('algoSelect').value = 'dfs';
         }
+        renderStructureTable(m, $('algoSelect').value);
     }
 
     $('modeSelect').addEventListener('change', () => {
         const m = $('modeSelect').value;
         $('algoSelect').disabled = m !== 'traverse';
+
+        // Chế độ "định chiều": chỉ áp dụng cho đồ thị vô hướng, nên khóa lựa chọn có hướng.
+        const ds = $('directedSelect');
+        if (ds) {
+            if (m === 'orient') {
+                ds.value = 'undirected';
+                ds.disabled = true;
+            } else {
+                ds.disabled = false;
+            }
+        }
+        applyDirectedFromUI();
+
         syncOrientAlgoField();
         syncAlgoTraversePanel();
         if (m === 'scc') $('questLabel').textContent = 'TPLTM (DFS Tarjan)';
@@ -1609,6 +1771,37 @@
         applyDirectedFromUI();
     });
 
+    $('addVertexInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $('btnAddVertex').click();
+        }
+    });
+
+    $('delVertexInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $('btnDelVertex').click();
+        }
+    });
+
+    $('edgeU').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            $('edgeV').focus(); 
+        }
+    });
+
+    $('edgeV').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $('btnAddEdge').click(); 
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            $('edgeU').focus(); 
+        }
+    });
+
     function init() {
         seedDemo();
         fillSelects();
@@ -1617,10 +1810,15 @@
         $('algoSelect').disabled = $('modeSelect').value !== 'traverse';
         $('infoWeak').textContent = String(weakComponentCount());
         $('infoScc').textContent = String(computeSCCMeta().length);
-        drawGraph(null);
+        currentSnap = null;
         updateInfoPanel(null);
         renderStructureTable('traverse', 'bfs');
         renderResultTable('traverse', null);
+        
+        requestAnimationFrame(function loop() {
+            drawGraph(currentSnap);
+            requestAnimationFrame(loop);
+        });
     }
 
     init();

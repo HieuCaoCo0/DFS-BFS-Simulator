@@ -4,45 +4,80 @@
     box-sizing: border-box;
 }
 
+/* Biến màu Dark Theme xịn xò, bắt mắt hơn */
 :root {
-    --bg: #e8e8ec;
-    --card: #ffffff;
-    --border: #c8c8d0;
-    --text: #1a1a22;
-    --muted: #5c5c6e;
-    --primary: #4a90d9;
-    --primary-dark: #3570b8;
-    --radius: 10px;
-    --shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    --bg-base: #0b0f19;      /* Nền tối sâu */
+    --card: #151b2b;         /* Nền card nổi */
+    --border: #2a3441;
+    --border-glow: #3b82f6;  /* Màu viền phát sáng */
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --primary: #3b82f6;      /* Xanh sáng */
+    --primary-dark: #2563eb;
+    --accent: #facc15;       /* Vàng gold cho thông số */
+    --radius: 12px;
+    --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 body {
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-    background: var(--bg);
+    /* Chuyển sang Times New Roman theo yêu cầu */
+    font-family: "Times New Roman", Times, serif;
+    background-color: var(--bg-base);
     color: var(--text);
     min-height: 100vh;
-    line-height: 1.45;
+    line-height: 1.5;
+    font-size: 1.05rem; /* Tăng nhẹ size vì font có chân hơi nhỏ */
+    
+    /* Thêm họa tiết chấm bi mờ (Dot Grid) ở background */
+    background-image: radial-gradient(#2a3441 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
 }
 
 .app {
     max-width: 1280px;
     margin: 0 auto;
-    padding: 16px 20px 28px;
+    padding: 20px 20px 30px;
 }
 
 .header {
     text-align: center;
-    margin-bottom: 16px;
+    margin-bottom: 24px;
+    text-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
 }
 
 .header h1 {
-    font-size: 1.35rem;
+    font-size: 1.6rem;
     font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5px;
 }
 
 .main {
     display: flex;
-    gap: 18px;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.main-top {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.main-top-left {
+    flex: 1 1 720px;
+    min-width: 320px;
+}
+
+.main-top-right {
+    flex: 1 1 360px;
+    min-width: 300px;
+}
+
+.main-bottom {
+    display: flex;
+    gap: 20px;
     align-items: flex-start;
     flex-wrap: wrap;
 }
@@ -52,7 +87,7 @@ body {
     min-width: 320px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
 .col-right {
@@ -60,7 +95,7 @@ body {
     min-width: 300px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
 .canvas-wrap {
@@ -76,48 +111,96 @@ body {
     width: 100%;
     max-width: 720px;
     height: auto;
-    border: 1px solid #222;
-    background: #fff;
+    border: 1px solid var(--border);
+    background: #0f1423; /* Nền canvas tối hơn một chút */
     cursor: crosshair;
     touch-action: none;
+    border-radius: 8px;
+    /* Keep default smoothing; avoid pixelated/crisp-edges which can make vector-like drawings look worse. */
+    image-rendering: auto;
 }
 
 .legend {
     display: flex;
     flex-wrap: wrap;
     gap: 12px 18px;
-    padding: 10px 12px;
+    padding: 12px 16px;
     background: var(--card);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
-    font-size: 0.88rem;
+    font-size: 0.95rem;
 }
 
 .legend-item {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 
 .swatch {
-    width: 14px;
-    height: 14px;
-    border: 1px solid #333;
-    border-radius: 2px;
+    width: 16px;
+    height: 16px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 3px;
     display: inline-block;
 }
 
-.swatch-unvisited { background: #b8d4f0; }
-.swatch-active { background: #f5d76e; }
-.swatch-visited { background: #a8e6a8; }
-.swatch-path { background: #2d8a54; }
+.swatch-unvisited { background: #1e293b; }
+.swatch-active { background: #eab308; box-shadow: 0 0 8px #eab308; }
+.swatch-visited { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.swatch-path { background: #14b8a6; }
 .swatch-edge-hl {
-    width: 28px;
+    width: 30px;
     height: 4px;
     border-radius: 2px;
-    background: #e74c3c;
+    background: #ef4444;
     border: none;
+    box-shadow: 0 0 8px #ef4444;
+}
+
+/* TẠO ĐIỂM NHẤN CHO CARD THÔNG TIN MÔ PHỎNG */
+.info-card {
+    border: 2px solid var(--border-glow) !important;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15) !important;
+    background: linear-gradient(145deg, #1e293b, #0f172a) !important;
+}
+
+.info-card h2 {
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}
+
+/* Làm nổi bật danh sách thông tin */
+.info-list {
+    list-style: none;
+    font-size: 1rem;
+}
+
+.info-list li {
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(59, 130, 246, 0.08); /* Highlight nền từng dòng nhẹ */
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.info-list .label {
+    color: #60a5fa; /* Chuyển thành xanh dương sáng cho dễ đọc */
+    font-weight: bold;
+}
+
+.info-list strong {
+    color: var(--accent); /* Màu vàng gold nổi bật */
+    font-size: 1.25rem; /* Phóng to số liệu */
+    text-shadow: 0 0 10px rgba(250, 204, 21, 0.5);
 }
 
 .card {
@@ -125,63 +208,84 @@ body {
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
-    padding: 14px 16px;
+    padding: 18px 20px;
 }
 
 .card h2 {
-    font-size: 0.95rem;
-    margin-bottom: 10px;
-    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    font-weight: 700;
 }
 
+/* Nổi bật phần chữ nhiệm vụ và trạng thái */
 .muted {
     color: var(--muted);
-    font-size: 0.88rem;
-    margin-bottom: 6px;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+}
+
+#questLabel {
+    color: #facc15; /* Vàng gold */
+    font-weight: bold;
+    font-size: 1.05rem;
+    text-shadow: 0 0 8px rgba(250, 204, 21, 0.3);
+}
+
+#simStatus {
+    color: #34d399; /* Xanh emerald dạ quang */
+    font-weight: bold;
+    font-size: 1.05rem;
+    text-shadow: 0 0 8px rgba(52, 211, 153, 0.3);
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-bottom: 10px;
-    font-size: 0.85rem;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
 }
 
-/* Ẩn hẳn khỏi layout khi không ở chế độ định chiều (tránh xung đột với display:flex của .field) */
-#orientAlgoField.is-orient-only-hidden {
-    display: none !important;
-}
-
+#orientAlgoField.is-orient-only-hidden,
 .algo-mode-panel-hidden {
     display: none !important;
 }
 
 .algo-mode-readonly {
-    padding: 8px 10px;
+    padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.9rem;
-    background: #f5f5f8;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #111827;
     color: var(--muted);
 }
 
 .field span:first-child {
-    font-weight: 500;
+    font-weight: 600;
     color: var(--muted);
 }
 
 .field input,
 .field select {
-    padding: 8px 10px;
+    font-family: "Times New Roman", Times, serif;
+    padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: #1e293b;
+    color: var(--text);
+    transition: all 0.2s;
+}
+
+.field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 
 .field.btn-only {
     justify-content: flex-end;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .btn-only .btn {
@@ -191,13 +295,13 @@ body {
 .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 12px;
 }
 
 .inline-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 10px;
 }
 
 .edge-row .grow {
@@ -207,89 +311,97 @@ body {
 .btn-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 10px;
+    margin-top: 6px;
 }
 
 .btn-row.wrap {
-    margin-top: 8px;
+    margin-top: 12px;
 }
 
 .btn {
-    padding: 8px 14px;
+    font-family: "Times New Roman", Times, serif;
+    font-weight: 600;
+    padding: 10px 16px;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    background: #f0f0f4;
+    border-radius: 8px;
+    background: #1e293b;
+    color: var(--text);
     cursor: pointer;
-    font-size: 0.88rem;
+    font-size: 1rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .btn:hover {
-    background: #e4e4ea;
+    background: #334155;
+    border-color: #475569;
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(1px);
 }
 
 .btn-primary {
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: #fff;
-    border-color: var(--primary-dark);
+    border: none;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .btn-primary:hover {
-    background: var(--primary-dark);
+    background: linear-gradient(135deg, #60a5fa, var(--primary));
 }
 
 .btn-run {
-    background: #d4e8fc;
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.btn-run:hover {
+    background: linear-gradient(135deg, #10b981, #059669);
 }
 
 .btn-block {
     width: 100%;
 }
 
-.info-list {
-    list-style: none;
-    font-size: 0.88rem;
-}
-
-.info-list li {
-    margin-bottom: 6px;
-}
-
-.info-list .label {
-    color: var(--muted);
-}
-
 .table-wrap {
-    max-height: 200px;
+    max-height: 220px;
     overflow: auto;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
 }
 
 .data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.82rem;
+    font-size: 0.95rem;
 }
 
 .data-table th,
 .data-table td {
-    padding: 6px 10px;
-    border-bottom: 1px solid #eee;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
     text-align: left;
 }
 
 .data-table th {
-    background: #f5f5f8;
+    background: #111827;
+    color: var(--primary);
     position: sticky;
     top: 0;
+    z-index: 10;
 }
 
 @media (max-width: 900px) {
-    .main {
-        flex-direction: column;
-    }
-    .grid-2 {
-        grid-template-columns: 1fr;
-    }
+    .main-top { flex-direction: column; }
+    .main-bottom { flex-direction: column; }
+    .grid-2 { grid-template-columns: 1fr; }
 }

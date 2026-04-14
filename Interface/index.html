@@ -5,181 +5,238 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mô phỏng DFS/BFS — TPLTM &amp; Định chiều</title>
     <link rel="stylesheet" href="./style.css">
+    
+    <style>
+        
+
+        /* 2. Dải phân cách Golden Divider cho thuật toán Kosaraju */
+        .kosaraju-divider {
+            text-align: center;
+            color: #facc15 !important; /* Vàng sáng */
+            background: rgba(250, 204, 21, 0.1) !important;
+            font-weight: 800 !important;
+            letter-spacing: 1.5px;
+            padding: 12px !important;
+            border-top: 2px dashed #facc15 !important;
+            border-bottom: 2px dashed #facc15 !important;
+            border-radius: 6px;
+            text-shadow: 0 0 8px rgba(250, 204, 21, 0.4);
+            margin: 8px 0;
+        }
+
+        /* 3. Tinh chỉnh lại bảng Ghi chú (Note) cho nổi bật */
+        #structureNote {
+            font-size: 0.95rem;
+            color: #e2e8f0;
+            margin-bottom: 15px;
+            line-height: 1.6;
+            padding: 12px 16px;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(30, 41, 59, 0.5) 100%);
+            border-left: 4px solid #3b82f6;
+            border-radius: 0 8px 8px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #structureNote strong {
+            color: #60a5fa;
+            text-shadow: 0 0 5px rgba(96, 165, 250, 0.3);
+        }
+    </style>
 </head>
 <body>
     <div class="app">
         <header class="header">
-            <h1>Mô phỏng đồ thị — DFS / BFS (TPLTM &amp; định chiều được)</h1>
+            <h1>🕸️ Mô phỏng đồ thị — DFS / BFS (TPLTM &amp; định chiều được)</h1>
         </header>
 
         <main class="main">
-            <section class="col-left">
-                <div class="canvas-wrap">
-                    <canvas id="graphCanvas" width="720" height="420" aria-label="Vùng vẽ đồ thị"></canvas>
-                </div>
-                <div class="legend" id="legend">
-                    <span class="legend-item"><i class="swatch swatch-unvisited"></i> Chưa thăm</span>
-                    <span class="legend-item"><i class="swatch swatch-active"></i> Đang xét</span>
-                    <span class="legend-item"><i class="swatch swatch-visited"></i> Đã thăm</span>
-                    <span class="legend-item"><i class="swatch swatch-path"></i> Đường đi / nhóm</span>
-                    <span class="legend-item"><span class="swatch swatch-edge-hl"></span> Cạnh đang duyệt</span>
-                </div>
-                <div class="card info-card">
-                    <h2>Thông tin mô phỏng</h2>
-                    <ul class="info-list">
-                        <li><span class="label">Số thành phần liên thông (vô hướng):</span> <strong id="infoWeak">—</strong></li>
-                        <li><span class="label">Số TPLTM (có hướng):</span> <strong id="infoScc">—</strong></li>
-                        <li><span class="label">Định chiều mạnh (Robbins):</span> <strong id="infoOrient">—</strong></li>
-                        <li><span class="label">Bước hiện tại:</span> <strong id="infoStep">0</strong></li>
-                        <li><span class="label">Đỉnh đang xét:</span> <strong id="infoVertex">Chưa bắt đầu</strong></li>
-                        <li><span class="label">Ghi chú bước:</span> <strong id="infoMsg">—</strong></li>
-                    </ul>
-                </div>
-            </section>
+            <div class="main-top">
+                <section class="main-top-left">
+                    <div class="canvas-wrap">
+                        <canvas id="graphCanvas" width="720" height="420" aria-label="Vùng vẽ đồ thị"></canvas>
+                    </div>
+                </section>
 
-            <section class="col-right">
-                <div class="card">
-                    <h2>Nhiệm vụ / Chế độ</h2>
-                    <p class="muted">Nhiệm vụ: <span id="questLabel">Chưa chọn</span></p>
-                    <p class="muted">Trạng thái: <span id="simStatus">Ready</span></p>
-                    <label class="field">
-                        <span>Chế độ mô phỏng</span>
-                        <select id="modeSelect">
-                            <option value="traverse">Duyệt đồ thị (BFS / DFS)</option>
-                            <option value="scc">Tìm TPLTM — Tarjan (DFS, một lần duyệt)</option>
-                            <option value="kosaraju">Tìm TPLTM — Kosaraju (GĐ1: DFS xếp L; GĐ2: BFS trên G^T)</option>
-                            <option value="orient">Kiểm tra định chiều mạnh (cầu — DFS / BFS)</option>
-                        </select>
-                    </label>
-                    <label class="field" id="orientAlgoField">
-                        <span>Tìm cầu (định chiều)</span>
-                        <select id="orientAlgoSelect">
-                            <option value="dfs">DFS — thời gian thăm &amp; low</option>
-                            <option value="bfs">BFS — loại từng cạnh, kiểm tra liên thông</option>
-                        </select>
-                    </label>
-                    <div id="algoTraverseWrap">
+                <section class="main-top-right">
+                    <div class="card info-card">
+                        <h2>📊 Thông tin mô phỏng</h2>
+                        <ul class="info-list">
+                            <li><span class="label">Số thành phần liên thông (vô hướng):</span> <strong id="infoWeak">—</strong></li>
+                            <li><span class="label">Số TPLTM (có hướng):</span> <strong id="infoScc">—</strong></li>
+                            <li><span class="label">Định chiều mạnh (Robbins):</span> <strong id="infoOrient">—</strong></li>
+                            <li><span class="label">Bước hiện tại:</span> <strong id="infoStep">0</strong></li>
+                            <li><span class="label">Đỉnh đang xét:</span> <strong id="infoVertex">Chưa bắt đầu</strong></li>
+                            <li><span class="label">Ghi chú bước:</span> <strong id="infoMsg">—</strong></li>
+                        </ul>
+                    </div>
+                </section>
+            </div>
+
+            <div class="main-bottom">
+                <section class="col-left">
+                    <div class="legend" id="legend">
+                        <span class="legend-item"><i class="swatch swatch-unvisited"></i> Chưa thăm</span>
+                        <span class="legend-item"><i class="swatch swatch-active"></i> Đang xét</span>
+                        <span class="legend-item"><i class="swatch swatch-visited"></i> Đã thăm</span>
+                        <span class="legend-item"><i class="swatch swatch-path"></i> Đường đi / nhóm</span>
+                        <span class="legend-item"><span class="swatch swatch-edge-hl"></span> Cạnh đang duyệt</span>
+                    </div>
+
+                    <div class="card">
+                        <h2>Nhiệm vụ / Chế độ</h2>
+                        <p class="muted">Nhiệm vụ: <span id="questLabel">Chưa chọn</span></p>
+                        <p class="muted">Trạng thái: <span id="simStatus">Ready</span></p>
+                        
                         <label class="field">
-                            <span>Thuật toán duyệt</span>
-                            <select id="algoSelect">
-                                <option value="bfs">BFS (hàng đợi)</option>
-                                <option value="dfs">DFS (đệ quy / stack)</option>
+                            <span>Chế độ mô phỏng</span>
+                            <select id="modeSelect">
+                                <option value="traverse">Duyệt đồ thị (BFS / DFS)</option>
+                                <option value="scc">Tìm TPLTM — Tarjan (DFS, một lần duyệt)</option>
+                                <option value="kosaraju">Tìm TPLTM — Kosaraju (GĐ1: DFS xếp L; GĐ2: BFS trên G^T)</option>
+                                <option value="orient">Kiểm tra định chiều mạnh (cầu — DFS / BFS)</option>
                             </select>
                         </label>
-                    </div>
-                    <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoTarjanHint">
-                        <span>Thuật toán duyệt</span>
-                        <div class="algo-mode-readonly">DFS (Tarjan)</div>
-                    </div>
-                    <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoKosarajuHint">
-                        <span>Thuật toán duyệt</span>
-                        <div class="algo-mode-readonly">DFS (giai đoạn 1) + BFS trên G^T (giai đoạn 2)</div>
-                    </div>
-                    <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoOrientHint">
-                        <span>Thuật toán duyệt</span>
-                        <div class="algo-mode-readonly" id="algoOrientReadonly"></div>
-                    </div>
-                    <div class="btn-row">
-                        <button type="button" class="btn btn-primary" id="btnBuildSim">Tạo mô phỏng</button>
-                        <button type="button" class="btn" id="btnCheck">Kiểm tra / áp màu kết quả</button>
-                    </div>
-                </div>
 
-                <div class="card">
-                    <h2>Điều khiển</h2>
-                    <div class="grid-2">
-                        <label class="field">
-                            <span>Đỉnh bắt đầu</span>
-                            <select id="startSelect"></select>
+                        <label class="field" id="orientAlgoField">
+                            <span>Tìm cầu (định chiều)</span>
+                            <select id="orientAlgoSelect">
+                                <option value="dfs">DFS — thời gian thăm &amp; low</option>
+                                <option value="bfs">BFS — loại từng cạnh, kiểm tra liên thông</option>
+                            </select>
                         </label>
-                        <label class="field">
-                            <span>Đỉnh kết thúc</span>
-                            <select id="endSelect"></select>
-                        </label>
-                    </div>
-                    <label class="field">
-                        <span>Đồ thị</span>
-                        <select id="directedSelect">
-                            <option value="undirected">Vô hướng</option>
-                            <option value="directed">Có hướng</option>
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span>Tốc độ chạy (ms)</span>
-                        <input type="number" id="speedInput" value="800" min="100" step="100">
-                    </label>
-                    <div class="btn-row wrap">
-                        <button type="button" class="btn btn-run" id="btnPlay">▶ Chạy</button>
-                        <button type="button" class="btn" id="btnPause">⏸ Dừng</button>
-                        <button type="button" class="btn" id="btnStep">⏯ Step</button>
-                        <button type="button" class="btn" id="btnReset">↺ Reset</button>
-                    </div>
-                </div>
 
-                <div class="card">
-                    <h2>Chỉnh sửa đồ thị</h2>
-                    <div class="grid-2">
-                        <label class="field">
-                            <span>Thêm đỉnh</span>
-                            <input type="text" id="addVertexInput" placeholder="VD: A hoặc 1">
-                        </label>
-                        <div class="field btn-only">
-                            <button type="button" class="btn btn-block" id="btnAddVertex">Add Vertex</button>
+                        <div id="algoTraverseWrap">
+                            <label class="field">
+                                <span>Thuật toán duyệt</span>
+                                <select id="algoSelect">
+                                    <option value="bfs">BFS (hàng đợi)</option>
+                                    <option value="dfs">DFS (đệ quy / stack)</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoTarjanHint">
+                            <span>Thuật toán duyệt</span>
+                            <div class="algo-mode-readonly">DFS (Tarjan)</div>
+                        </div>
+                        <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoKosarajuHint">
+                            <span>Thuật toán duyệt</span>
+                            <div class="algo-mode-readonly">DFS (giai đoạn 1) + BFS trên G^T (giai đoạn 2)</div>
+                        </div>
+                        <div class="field algo-mode-hint algo-mode-panel-hidden" id="algoOrientHint">
+                            <span>Thuật toán duyệt</span>
+                            <div class="algo-mode-readonly" id="algoOrientReadonly"></div>
+                        </div>
+
+                        <div class="btn-row">
+                            <button type="button" class="btn btn-primary" id="btnBuildSim">⚙️ Tạo mô phỏng</button>
+                            <button type="button" class="btn" id="btnCheck">🎨 Kiểm tra kết quả</button>
                         </div>
                     </div>
-                    <div class="grid-2">
-                        <label class="field">
-                            <span>Xóa đỉnh</span>
-                            <input type="text" id="delVertexInput" placeholder="VD: 6">
-                        </label>
-                        <div class="field btn-only">
-                            <button type="button" class="btn btn-block" id="btnDelVertex">Delete Vertex</button>
+
+                    <div class="card">
+                        <h2 id="structureTitle">Hàng đợi (Queue) / Ngăn xếp (Stack)</h2>
+                        <div class="table-wrap">
+                            <table class="data-table" id="structureTable">
+                                <thead>
+                                    <tr>
+                                        <th>Bước</th>
+                                        <th id="structureCol2">Cấu trúc dữ liệu</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
-                    <div class="edge-row">
-                        <label class="field grow">
-                            <span>Cạnh u → v</span>
-                            <div class="inline-2">
-                                <input type="text" id="edgeU" placeholder="u">
-                                <input type="text" id="edgeV" placeholder="v">
+
+                    <div class="card">
+                        <h2>Bảng kết quả</h2>
+                        <div class="table-wrap">
+                            <table class="data-table" id="resultTable">
+                                <thead>
+                                    <tr>
+                                        <th>Đỉnh</th>
+                                        <th id="resultCol2">Chỉ số TPLTM / Thông tin</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="col-right">
+                    <div class="card">
+                        <h2>🎮 Điều khiển</h2>
+                        <div class="grid-2">
+                            <label class="field">
+                                <span>Đỉnh bắt đầu</span>
+                                <select id="startSelect"></select>
+                            </label>
+                            <label class="field">
+                                <span>Đỉnh kết thúc</span>
+                                <select id="endSelect"></select>
+                            </label>
+                        </div>
+                        <label class="field">
+                            <span>Đồ thị</span>
+                            <select id="directedSelect">
+                                <option value="undirected">Vô hướng</option>
+                                <option value="directed">Có hướng</option>
+                            </select>
+                        </label>
+                        <label class="field">
+                            <span>Tốc độ chạy (ms)</span>
+                            <input type="number" id="speedInput" value="800" min="100" step="100">
+                        </label>
+                        <div class="btn-row wrap">
+                            <button type="button" class="btn btn-run" id="btnPlay">▶ Chạy</button>
+                            <button type="button" class="btn" id="btnPause">⏸ Dừng</button>
+                            <button type="button" class="btn" id="btnStep">⏯ Step</button>
+                            <button type="button" class="btn" id="btnReset">↺ Reset</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>🛠️ Chỉnh sửa đồ thị</h2>
+                        <div class="grid-2">
+                            <label class="field">
+                                <span>Thêm đỉnh</span>
+                                <input type="text" id="addVertexInput" placeholder="VD: 7">
+                            </label>
+                            <div class="field btn-only">
+                                <button type="button" class="btn btn-block" id="btnAddVertex">➕ Add Vertex</button>
                             </div>
-                        </label>
+                        </div>
+                        <div class="grid-2">
+                            <label class="field">
+                                <span>Xóa đỉnh</span>
+                                <input type="text" id="delVertexInput" placeholder="VD: 6">
+                            </label>
+                            <div class="field btn-only">
+                                <button type="button" class="btn btn-block" id="btnDelVertex">🗑️ Delete Vertex</button>
+                            </div>
+                        </div>
+                        <div class="edge-row">
+                            <label class="field grow">
+                                <span>Cạnh u → v</span>
+                                <div class="inline-2">
+                                    <input type="text" id="edgeU" placeholder="u (Ấn Enter sang v)">
+                                    <input type="text" id="edgeV" placeholder="v (Ấn Enter thêm)">
+                                </div>
+                            </label>
+                        </div>
+                        <div class="btn-row">
+                            <button type="button" class="btn" id="btnAddEdge">🔗 Add Edge</button>
+                            <button type="button" class="btn" id="btnDelEdge">✂️ Delete Edge</button>
+                        </div>
+                        <div class="btn-row">
+                            <button type="button" class="btn" id="btnLayout">✨ Sắp xếp lại</button>
+                            <button type="button" class="btn" id="btnUpdateWeak">🔄 Cập nhật TPLT</button>
+                        </div>
                     </div>
-                    <div class="btn-row">
-                        <button type="button" class="btn" id="btnAddEdge">Add Edge</button>
-                        <button type="button" class="btn" id="btnDelEdge">Delete Edge</button>
-                    </div>
-                    <div class="btn-row">
-                        <button type="button" class="btn" id="btnLayout">Sắp xếp lại đồ thị</button>
-                        <button type="button" class="btn" id="btnUpdateWeak">Cập nhật TPLT</button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2 id="structureTitle">Hàng đợi (Queue)</h2>
-                    <div class="table-wrap">
-                        <table class="data-table" id="structureTable">
-                            <thead><tr><th>Bước</th><th id="structureCol2">Hàng đợi</th></tr></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <h2>Bảng kết quả</h2>
-                    <div class="table-wrap">
-                        <table class="data-table" id="resultTable">
-                            <thead>
-                                <tr>
-                                    <th>Đỉnh</th>
-                                    <th id="resultCol2">Thông tin</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </main>
     </div>
     <script src="./script.js"></script>
