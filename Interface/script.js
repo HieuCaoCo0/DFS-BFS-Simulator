@@ -25,6 +25,7 @@
     let playTimer = null;
     let lastStructureRows = [];
     let lastResultRows = [];
+    let forceInfoZero = false;
 
     // Biến dùng để loop animation lắc lư
     let currentSnap = null;
@@ -44,6 +45,10 @@
 
     function canonicalUndirected(u, v) {
         return u <= v ? [u, v] : [v, u];
+    }
+
+    function randInt(min, max) {
+        return Math.floor(min + Math.random() * (max - min + 1));
     }
 
     function buildAdj(asUndirected) {
@@ -1130,6 +1135,10 @@
     }
 
     function updateInfoPanel(snap) {
+        if (forceInfoZero) {
+            $('infoWeak').textContent = '0';
+            $('infoScc').textContent = '0';
+        } else {
         $('infoWeak').textContent = String(weakComponentCount());
         const mode = $('modeSelect').value;
         if ((mode === 'scc' || mode === 'kosaraju') && directed) {
@@ -1139,6 +1148,7 @@
             $('infoScc').textContent = '— (chọn có hướng)';
         } else {
             $('infoScc').textContent = directed ? String(computeSCCMeta().length) : String(weakComponentCount());
+        }
         }
 
         if (snap && snap.orientable != null) {
@@ -1218,10 +1228,12 @@
 
     function renderResultTable(mode, snap) {
         const tbody = $('resultTable').querySelector('tbody');
+        const col1 = $('resultTable').querySelector('thead th:first-child');
         const col2 = $('resultCol2');
         tbody.innerHTML = '';
 
         if (mode === 'traverse' && snap && snap.dist) {
+            col1.textContent = 'Đỉnh';
             col2.textContent = 'Khoảng cách BFS';
             vertices.forEach((v) => {
                 const tr = document.createElement('tr');
@@ -1232,6 +1244,7 @@
             return;
         }
         if (mode === 'traverse' && snap && snap.visited) {
+            col1.textContent = 'Đỉnh';
             col2.textContent = 'Đã thăm DFS';
             vertices.forEach((v) => {
                 const tr = document.createElement('tr');
@@ -1241,17 +1254,36 @@
             return;
         }
         if ((mode === 'scc' || mode === 'kosaraju') && snap && snap.componentOf) {
-            col2.textContent = 'Chỉ số TPLTM';
+            col1.textContent = mode === 'scc' ? 'TPLTM (Tarjan)' : 'TPLTM (Kosaraju)';
+            col2.textContent = 'Các đỉnh thuộc TPLTM';
+
+            const groups = {};
             vertices.forEach((v) => {
-                const tr = document.createElement('tr');
                 const c = snap.componentOf[v.id];
-                tr.innerHTML = '<td>' + v.id + '</td><td>' + (c == null ? '—' : String(c)) + '</td>';
-                tbody.appendChild(tr);
+                if (c == null) return;
+                if (!groups[c]) groups[c] = [];
+                groups[c].push(v.id);
             });
+
+            Object.keys(groups)
+                .sort((a, b) => Number(a) - Number(b))
+                .forEach((compId) => {
+                    const tr = document.createElement('tr');
+                    const list = groups[compId].join(', ');
+                    tr.innerHTML = '<td>' + compId + '</td><td>{' + list + '}</td>';
+                    tbody.appendChild(tr);
+                });
+
+            if (!tbody.children.length) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td colspan="2">Chưa xác định được TPLTM</td>';
+                tbody.appendChild(tr);
+            }
             return;
         }
         if (mode === 'orient') {
-            col2.textContent = 'Cầu (u—v)';
+            col1.textContent = 'u';
+            col2.textContent = 'v';
             const br = (snap && snap.bridges) || [];
             if (!br.length) {
                 const tr = document.createElement('tr');
@@ -1266,6 +1298,7 @@
             }
             return;
         }
+        col1.textContent = 'Đỉnh';
         col2.textContent = 'Thông tin';
         const tr = document.createElement('tr');
         tr.innerHTML = '<td colspan="2">Chạy mô phỏng để xem</td>';
@@ -1277,6 +1310,7 @@
         stepIndex = Math.max(0, Math.min(i, steps.length - 1));
         const snap = steps[stepIndex];
         
+        if (stepIndex > 0) forceInfoZero = false;
         currentSnap = snap; 
         updateInfoPanel(snap);
 
@@ -1355,6 +1389,7 @@
 
     function buildSimulation() {
         clearTimer();
+        forceInfoZero = true;
         applyDirectedFromUI();
         const mode = $('modeSelect').value;
         const algo = $('algoSelect').value;
@@ -1416,6 +1451,9 @@
         if (!steps.length) buildSimulation();
         if (!steps.length) return;
         clearTimer();
+        forceInfoZero = true;
+        $('infoWeak').textContent = '0';
+        $('infoScc').textContent = '0';
         const ms = parseInt($('speedInput').value, 10) || 800;
         setStatus('Đang chạy');
         playTimer = setInterval(() => {
@@ -1437,6 +1475,9 @@
     function stepFwd() {
         clearTimer();
         if (!steps.length) buildSimulation();
+        forceInfoZero = true;
+        $('infoWeak').textContent = '0';
+        $('infoScc').textContent = '0';
         if (stepIndex < steps.length - 1) stepIndex++;
         showStep(stepIndex);
         setStatus('Step');
@@ -1444,6 +1485,9 @@
 
     function resetSim() {
         clearTimer();
+        forceInfoZero = true;
+        $('infoWeak').textContent = '0';
+        $('infoScc').textContent = '0';
         stepIndex = 0;
         if (steps.length) showStep(0);
         else {
@@ -1690,6 +1734,89 @@
         applyDirectedFromUI();
         $('infoScc').textContent = directed ? String(computeSCCMeta().length) : String(weakComponentCount());
     });
+
+    function edgeExists(u, v) {
+        if (directed) return edges.some((e) => e.u === u && e.v === v);
+        const [a, b] = canonicalUndirected(u, v);
+        return edges.some((e) => {
+            const [x, y] = canonicalUndirected(e.u, e.v);
+            return x === a && y === b;
+        });
+    }
+
+    function addEdgeUnique(u, v) {
+        if (!u || !v) return false;
+        if (u === v) return false;
+        if (!vertexById(u) || !vertexById(v)) return false;
+        if (!directed) {
+            const [a, b] = canonicalUndirected(u, v);
+            u = a;
+            v = b;
+        }
+        if (edgeExists(u, v)) return false;
+        edges.push({ u, v });
+        return true;
+    }
+
+    function generateRandomGraph() {
+        pause();
+        applyDirectedFromUI();
+
+        const mode = $('modeSelect') ? $('modeSelect').value : 'traverse';
+        const n = randInt(5, 12);
+
+        vertices = Array.from({ length: n }, (_, i) => ({
+            id: String(i),
+            x: 0,
+            y: 0,
+        }));
+        edges = [];
+
+        if (!directed) {
+            // Tạo khung liên thông trước (spanning tree) để đồ thị không quá rời rạc.
+            for (let i = 1; i < n; i++) {
+                const j = randInt(0, i - 1);
+                addEdgeUnique(String(i), String(j));
+            }
+            const p = 0.28;
+            for (let i = 0; i < n; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    if (Math.random() < p) addEdgeUnique(String(i), String(j));
+                }
+            }
+        } else {
+            // Bảo đảm mỗi đỉnh có ít nhất 1 cạnh đi ra.
+            for (let i = 0; i < n; i++) {
+                let j = randInt(0, n - 1);
+                if (j === i) j = (j + 1) % n;
+                addEdgeUnique(String(i), String(j));
+            }
+            const p = 0.22;
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    if (i === j) continue;
+                    if (Math.random() < p) addEdgeUnique(String(i), String(j));
+                }
+            }
+        }
+
+        defaultLayout();
+        fillSelects();
+
+        steps = [];
+        stepIndex = 0;
+        currentSnap = null;
+        updateInfoPanel(null);
+        renderStructureTable(mode, $('algoSelect') ? $('algoSelect').value : 'bfs');
+        renderResultTable(mode, null);
+
+        $('infoWeak').textContent = String(weakComponentCount());
+        $('infoScc').textContent = directed ? String(computeSCCMeta().length) : String(weakComponentCount());
+        setStatus('Ready');
+    }
+
+    const autoBtn = $('btnAutoGraph');
+    if (autoBtn) autoBtn.addEventListener('click', () => generateRandomGraph());
 
     $('btnBuildSim').addEventListener('click', () => buildSimulation());
     $('btnPlay').addEventListener('click', () => play());
